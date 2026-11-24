@@ -4,7 +4,7 @@
 > **Paste messy supplier feed → Click Refresh All → Get a clean Shopify upload file.**
 > No manual fixing. No overselling. No broken dates.
 
-![Shopify Pipeline](images/03-cleaned-output.png)
+![Shopify Pipeline](Images/03-cleaned-output.png)
 
 | | |
 | :--- | :--- |
@@ -31,7 +31,7 @@ One mistake = wrong price, wrong stock, accidental overselling.
 
 ## ✅ What The Client Asked For
 
-![Client Request](images/Client%20Request.PNG)
+![Client Request](Images/client-request.png)
 
 ### 1. Shopify Catalog Formatting
 - **Handle:** URL-safe, all lowercase, single hyphens → `cozy-hoodie-white-m`
@@ -77,7 +77,7 @@ One mistake = wrong price, wrong stock, accidental overselling.
 
 ### 1. Raw Supplier Feed — `Raw Data`
 Messy dates, `"NULL"` strings, raw costs, `"OUT"` rows, duplicate SKUs.
-![Raw Data](images/01-raw-data.png)
+![Raw Data](Images/01-raw-data.png)
 
 ### 2. Transformation Engine — Power Query (M)
 Schema enforcement, custom date parser, conservative dedup, conditional rules.
@@ -85,7 +85,7 @@ Schema enforcement, custom date parser, conservative dedup, conditional rules.
 
 ### 3. Final Output — `Cleaned_Inventory_Data`
 100% deduplicated, standardized, ready for direct Shopify CSV import.
-![Cleaned Output](images/03-cleaned-output.png)
+![Cleaned Output](Images/03-cleaned-output.png)
 
 ---
 
