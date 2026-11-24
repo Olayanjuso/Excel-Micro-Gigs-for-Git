@@ -1,0 +1,42 @@
+let
+    Source = Excel.CurrentWorkbook(){[Name="Raw_Inventory_Dat"]}[Content],
+    #"Changed Type" = Table.TransformColumnTypes(Source,{{"Supplier_SKU", type text}, {"Product Name", type text}, {"Qty_On_Hand", type any}, {"Cost_Price", type number}, {"Status", type text}, {"Update_Date", type any}}),
+    #"Duplicated Column" = Table.DuplicateColumn(#"Changed Type", "Product Name", "Product Name - Copy"),
+    #"Renamed Columns" = Table.RenameColumns(#"Duplicated Column",{{"Product Name", "Handle"}}),
+    #"Trimmed Text" = Table.TransformColumns(#"Renamed Columns",{{"Handle", Text.Trim, type text}}),
+    #"Lowercased Text" = Table.TransformColumns(#"Trimmed Text",{{"Handle", each Text.Replace(Text.Lower(_), " ", "-"), type text}}),
+    #"Renamed Columns1" = Table.RenameColumns(#"Lowercased Text",{{"Product Name - Copy", "Title"}}),
+    #"Trimmed Text1" = Table.TransformColumns(#"Renamed Columns1",{{"Title", Text.Trim, type text}}),
+    #"Capitalized Each Word" = Table.TransformColumns(#"Trimmed Text1",{{"Title", Text.Proper, type text}}),
+    #"Trimmed Text2" = Table.TransformColumns(#"Capitalized Each Word",{{"Supplier_SKU", Text.Trim, type text}}),
+    #"Uppercased Text" = Table.TransformColumns(#"Trimmed Text2",{{"Supplier_SKU", Text.Upper, type text}}),
+    #"Changed Type1" = Table.TransformColumnTypes(#"Uppercased Text",{{"Qty_On_Hand", Int64.Type}}),
+    #"Replaced Value" = Table.ReplaceValue(#"Changed Type1",null,0,Replacer.ReplaceValue,{"Qty_On_Hand"}),
+    #"Added Custom" = Table.AddColumn(#"Replaced Value", "Price", each [Cost_Price]*1.4),
+    #"Changed Type2" = Table.TransformColumnTypes(#"Added Custom",{{"Price", Currency.Type}}),
+    #"Added Conditional Column" = Table.AddColumn(#"Changed Type2", "Track Quantity", each if [Qty_On_Hand] > 0 then "Deny" else if [Qty_On_Hand] = 0 then "Allow" else null),
+    #"Sorted Rows" = Table.Sort(#"Added Conditional Column",{{"Supplier_SKU", Order.Ascending}}),
+    #"Filtered Rows" = Table.SelectRows(#"Sorted Rows", each ([Status] <> "OUT")),
+    #"Renamed Columns2" = Table.RenameColumns(#"Filtered Rows",{{"Cost_Price", "Cost_Price ($)"}, {"Price", "Price ($)"}}),
+    #"Changed Type3" = Table.TransformColumnTypes(#"Renamed Columns2",{{"Update_Date", type text}}),
+    #"Trimmed Text3" = Table.TransformColumns(#"Changed Type3",{{"Update_Date", Text.Trim, type text}}),
+    #"Added Custom1" = Table.AddColumn(#"Trimmed Text3", "Cleaned_Date", each let
+        noTime = try Text.BeforeDelimiter([Update_Date], " ") otherwise [Update_Date],
+        norm = Text.Replace(noTime, "-", "/"),
+        parts = List.Transform(Text.Split(norm, "/"), each try Number.From(_) otherwise null),
+        parsed = if List.Count(parts) <> 3 or List.Contains(parts, null) then null
+                 else if parts{2} < 100 then #date(2000 + parts{0}, parts{1}, parts{2})
+                 else if parts{0} > 12 then #date(parts{2}, parts{1}, parts{0})
+                 else #date(parts{2}, parts{0}, parts{1})
+    in
+        parsed),
+    #"Changed Type4" = Table.TransformColumnTypes(#"Added Custom1",{{"Cleaned_Date", type date}}),
+    #"Removed Columns" = Table.RemoveColumns(#"Changed Type4",{"Cost_Price ($)", "Update_Date"}),
+    #"Sorted Rows1" = Table.Buffer(Table.Sort(#"Removed Columns",{{"Cleaned_Date", Order.Descending}, {"Qty_On_Hand", Order.Ascending}})),
+    #"Grouped Rows" = Table.Group(#"Sorted Rows1", {"Supplier_SKU"}, {{"Latest_Record", each _, type table [Supplier_SKU=text, Handle=text, Qty_On_Hand=nullable number, Status=nullable text, Title=text, #"Price ($)"=nullable number, Track Quantity=text, Cleaned_Date=nullable date]}}),
+    #"Added Custom2" = Table.AddColumn(#"Grouped Rows", "Single_Latest_Row", each Table.First([#"Latest_Record"])),
+    #"Removed Columns1" = Table.RemoveColumns(#"Added Custom2",{"Latest_Record"}),
+    #"Expanded Single_Latest_Row" = Table.ExpandRecordColumn(#"Removed Columns1", "Single_Latest_Row", {"Handle", "Qty_On_Hand", "Status", "Title", "Price ($)", "Track Quantity", "Cleaned_Date"}, {"Handle", "Qty_On_Hand", "Status", "Title", "Price ($)", "Track Quantity", "Cleaned_Date"}),
+    #"Replaced Value1" = Table.ReplaceValue(#"Expanded Single_Latest_Row","NULL","Unknown",Replacer.ReplaceText,{"Status"})
+in
+    #"Replaced Value1"
