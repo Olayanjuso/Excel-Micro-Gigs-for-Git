@@ -81,7 +81,7 @@ Messy dates, `"NULL"` strings, raw costs, `"OUT"` rows, duplicate SKUs.
 
 ### 2. Transformation Engine — Power Query (M)
 Schema enforcement, custom date parser, conservative dedup, conditional rules.
-![Power Query Editor](images/02-power-query-editor.png)
+![Power Query Editor](Images/02-power-query-editor.png)
 
 ### 3. Final Output — `Cleaned_Inventory_Data`
 100% deduplicated, standardized, ready for direct Shopify CSV import.
