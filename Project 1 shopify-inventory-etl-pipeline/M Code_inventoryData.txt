@@ -1,16 +1,18 @@
 let
     Source = Excel.CurrentWorkbook(){[Name="Raw_Inventory_Dat"]}[Content],
-    #"Changed Type" = Table.TransformColumnTypes(Source,{{"Supplier_SKU", type text}, {"Product Name", type text}, {"Qty_On_Hand", type any}, {"Cost_Price", type number}, {"Status", type text}, {"Update_Date", type any}}),
+    #"Filtered Blank Rows" = Table.SelectRows(Source, each [Supplier_SKU] <> null and Text.Trim(Text.From([Supplier_SKU])) <> ""),
+    #"Changed Type" = Table.TransformColumnTypes(#"Filtered Blank Rows",{{"Supplier_SKU", type text}, {"Product Name", type text}, {"Qty_On_Hand", type any}, {"Cost_Price", type number}, {"Status", type text}, {"Update_Date", type any}}),
     #"Duplicated Column" = Table.DuplicateColumn(#"Changed Type", "Product Name", "Product Name - Copy"),
     #"Renamed Columns" = Table.RenameColumns(#"Duplicated Column",{{"Product Name", "Handle"}}),
     #"Trimmed Text" = Table.TransformColumns(#"Renamed Columns",{{"Handle", Text.Trim, type text}}),
-    #"Lowercased Text" = Table.TransformColumns(#"Trimmed Text",{{"Handle", each Text.Replace(Text.Lower(_), " ", "-"), type text}}),
+    #"Lowercased Text" = Table.TransformColumns(#"Trimmed Text",{{"Handle", each Text.Replace(Text.Replace(Text.Lower(_), " - ", "-"), " ", "-"), type text}}),
     #"Renamed Columns1" = Table.RenameColumns(#"Lowercased Text",{{"Product Name - Copy", "Title"}}),
     #"Trimmed Text1" = Table.TransformColumns(#"Renamed Columns1",{{"Title", Text.Trim, type text}}),
     #"Capitalized Each Word" = Table.TransformColumns(#"Trimmed Text1",{{"Title", Text.Proper, type text}}),
     #"Trimmed Text2" = Table.TransformColumns(#"Capitalized Each Word",{{"Supplier_SKU", Text.Trim, type text}}),
     #"Uppercased Text" = Table.TransformColumns(#"Trimmed Text2",{{"Supplier_SKU", Text.Upper, type text}}),
-    #"Changed Type1" = Table.TransformColumnTypes(#"Uppercased Text",{{"Qty_On_Hand", Int64.Type}}),
+    #"Replaced Null Text" = Table.ReplaceValue(#"Uppercased Text","NULL",null,Replacer.ReplaceValue,{"Qty_On_Hand"}),
+    #"Changed Type1" = Table.TransformColumnTypes(#"Replaced Null Text",{{"Qty_On_Hand", Int64.Type}}),
     #"Replaced Value" = Table.ReplaceValue(#"Changed Type1",null,0,Replacer.ReplaceValue,{"Qty_On_Hand"}),
     #"Added Custom" = Table.AddColumn(#"Replaced Value", "Price", each [Cost_Price]*1.4),
     #"Changed Type2" = Table.TransformColumnTypes(#"Added Custom",{{"Price", Currency.Type}}),
@@ -21,10 +23,13 @@ let
     #"Changed Type3" = Table.TransformColumnTypes(#"Renamed Columns2",{{"Update_Date", type text}}),
     #"Trimmed Text3" = Table.TransformColumns(#"Changed Type3",{{"Update_Date", Text.Trim, type text}}),
     #"Added Custom1" = Table.AddColumn(#"Trimmed Text3", "Cleaned_Date", each let
-        noTime = try Text.BeforeDelimiter([Update_Date], " ") otherwise [Update_Date],
+        rawStr = [Update_Date],
+        asNum = try Number.From(rawStr) otherwise null,
+        noTime = try Text.BeforeDelimiter(rawStr, " ") otherwise rawStr,
         norm = Text.Replace(noTime, "-", "/"),
         parts = List.Transform(Text.Split(norm, "/"), each try Number.From(_) otherwise null),
-        parsed = if List.Count(parts) <> 3 or List.Contains(parts, null) then null
+        parsed = if asNum <> null then Date.From(asNum)
+                 else if List.Count(parts) <> 3 or List.Contains(parts, null) then null
                  else if parts{2} < 100 then #date(2000 + parts{0}, parts{1}, parts{2})
                  else if parts{0} > 12 then #date(parts{2}, parts{1}, parts{0})
                  else #date(parts{2}, parts{0}, parts{1})
