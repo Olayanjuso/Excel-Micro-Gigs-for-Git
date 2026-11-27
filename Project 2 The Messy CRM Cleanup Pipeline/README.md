@@ -57,7 +57,7 @@ No VBA. No manual cleaning. Paste → Refresh → Export.
 ![Clean Output](Images/04-cleaned-output.png)
 
 ### 4. Executive KPI Dashboard
-![Insights](images/05-crm-insight.png)
+![Insights](Images/05-crm-insight.png)
 
 ---
 
