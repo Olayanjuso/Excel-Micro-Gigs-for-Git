@@ -1,0 +1,43 @@
+let
+    Source = Excel.CurrentWorkbook(){[Name="MessyData"]}[Content],
+    #"Filtered Blank Rows" = Table.SelectRows(Source, each ([Raw_Name] <> null and Text.Trim(Text.From([Raw_Name])) <> "") or ([Email_Address] <> null and Text.Trim(Text.From([Email_Address])) <> "")),
+    #"Changed Type" = Table.TransformColumnTypes(#"Filtered Blank Rows",{{"Raw_Name", type text}, {"Email_Address", type text}, {"Chaotic_Phone", type any}, {"Company_Name", type text}, {"Tags_Field", type text}}),
+    #"Capitalized Each Word" = Table.TransformColumns(#"Changed Type",{{"Raw_Name", Text.Proper, type text}}),
+    #"Trimmed Text" = Table.TransformColumns(#"Capitalized Each Word",{{"Raw_Name", Text.Trim, type text}}),
+    #"Split Column by Delimiter" = Table.SplitColumn(#"Trimmed Text", "Raw_Name", Splitter.SplitTextByEachDelimiter({" "}, QuoteStyle.Csv, false), {"Raw_Name.1", "Raw_Name.2"}),
+    #"Changed Type1" = Table.TransformColumnTypes(#"Split Column by Delimiter",{{"Raw_Name.1", type text}, {"Raw_Name.2", type text}}),
+    #"Renamed Columns" = Table.RenameColumns(#"Changed Type1",{{"Raw_Name.1", "First_Name"}, {"Raw_Name.2", "Last_Name"}}),
+    #"Added Custom" = Table.AddColumn(#"Renamed Columns", "Clean_Phone", each let
+        raw = if [Chaotic_Phone] = null then "" else Text.Trim(Text.From([Chaotic_Phone])),
+        lower = Text.Lower(raw),
+        noExt = if Text.Contains(lower, "ext") then Text.BeforeDelimiter(lower, "ext") else lower,
+        digits = Text.Select(noExt, {"0".."9"}),
+        core = if Text.StartsWith(digits, "1") and Text.Length(digits) > 1 then Text.RemoveRange(digits, 0, 1) else digits,
+        isValidCore = Text.Length(core) = 10 and not Text.StartsWith(core, "0")
+    in
+        if isValidCore
+        then "(" & Text.Range(core, 0, 3) & ") " & Text.Range(core, 3, 3) & "-" & Text.Range(core, 6, 4)
+        else null),
+    #"Added Custom1" = Table.AddColumn(#"Added Custom", "Extension", each let
+        raw = if [Chaotic_Phone] = null then "" else Text.Trim(Text.From([Chaotic_Phone])),
+        lower = Text.Lower(raw),
+        ext = if Text.Contains(lower, "ext") 
+              then Text.Select(Text.AfterDelimiter(lower, "ext"), {"0".."9"}) 
+              else null
+    in
+        if ext = "" or ext = null then null else ext),
+    #"Added Custom2" = Table.AddColumn(#"Added Custom1", "Valid?", each let
+        raw = if [Chaotic_Phone] = null then "" else Text.Trim(Text.From([Chaotic_Phone])),
+        lower = Text.Lower(raw),
+        noExt = if Text.Contains(lower, "ext") then Text.BeforeDelimiter(lower, "ext") else lower,
+        digits = Text.Select(noExt, {"0".."9"}),
+        core = if Text.StartsWith(digits, "1") and Text.Length(digits) > 1 then Text.RemoveRange(digits, 0, 1) else digits
+    in
+        if raw = "" then "Missing"
+        else if Text.Length(core) = 10 and not Text.StartsWith(core, "0") then "Valid"
+        else if Text.Length(core) < 10 then "Invalid - Incomplete"
+        else if Text.Length(core) > 10 then "Invalid - Too Long"
+        else "Invalid - Bad Area Code"),
+    #"Removed Duplicates" = Table.Distinct(#"Added Custom2", {"First_Name", "Last_Name", "Email_Address"})
+in
+    #"Removed Duplicates"
